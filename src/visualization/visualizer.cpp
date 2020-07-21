@@ -10,6 +10,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <random>
 
 namespace depth_clustering {
 
@@ -29,13 +30,21 @@ using std::vector;
 static vector<array<int, 3>> COLORS;
 
 Visualizer::Visualizer(QWidget* parent)
-    : QGLViewer(parent), AbstractClient<Cloud>(), _updated{false} {
+    : QGLViewer(parent), AbstractClient<Cloud>(), SenderT{SenderType::STREAMER}, _updated{false} {
   _cloud_obj_storer.SetUpdateListener(this);
 }
 
 void Visualizer::draw() {
   lock_guard<mutex> guard(_cloud_mutex);
-  DrawCloud(_cloud);
+  // DrawCloud(_cloud);
+  // DrawCloudColored(_cloud, 1.0f, 0.0f, 0.0f);
+  // printf("--------%lu\n",_cloud_obj_storer.object_clouds().size());
+  // size_t cluster_num = _cloud_obj_storer.object_clouds().size();
+  // int iterator = 0;
+  myclusters.clear();
+  Eigen::Vector3f centerL = Eigen::Vector3f::Zero();
+  Eigen::Vector3f extentL(0.25,0.25,0.25);
+  DrawCube(centerL, extentL);
   for (const auto& kv : _cloud_obj_storer.object_clouds()) {
     const auto& cluster = kv.second;
     Eigen::Vector3f center = Eigen::Vector3f::Zero();
@@ -60,7 +69,24 @@ void Visualizer::draw() {
       extent = max_point - min_point;
     }
     DrawCube(center, extent);
+    float randr = 1;//cluster.points()[0].x()/20;//static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    float randg = 0;//cluster.points()[0].y()/20;//static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    float randb = 0;//1 - cluster.points()[0].z()/20;//static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    // printf("%f %f %f\n", randr, randg, randb);
+    if(center.x() > 0.5 && center.x() < 5){
+      if(center.y() < 1.5 && center.y() > -1.5){
+        DrawCloudColored(cluster, randr, randg, randb);
+        myclusters.push_back(std::make_pair(center, extent));
+      }
+      else if((center.y()+extent.y()/2 < 1.2 && center.y()+extent.y()/2 > -1.2) || (center.y()-extent.y()/2 < 1.2 && center.y()-extent.y()/2 > -1.2)){
+        // printf("%f %f %f :: %f %f %f\n", center.x(), center.y(), center.z(), extent.x(), extent.y(), extent.z());
+        DrawCloudColored(cluster, randg, randr, randb);
+        // myclusters.push_back(std::make_pair(center, extent));
+      }
+    }
+    else DrawCloudColored(cluster, randb, randg, randr);
   }
+  this->ShareDataWithAllClients(getClusters());
 }
 
 void Visualizer::init() {
@@ -73,6 +99,40 @@ void Visualizer::DrawCloud(const Cloud& cloud) {
   glPushMatrix();
   glBegin(GL_POINTS);
   glColor3f(1.0f, 1.0f, 1.0f);
+  for (const auto& point : cloud.points()) {
+    glVertex3f(point.x(), point.y(), point.z());
+  }
+  glEnd();
+  glPopMatrix();
+}
+
+std::pair<char, float> Visualizer::getClusters(){
+  char output = 0;
+  float nearest = std::numeric_limits<float>::max();
+  float x_min = std::numeric_limits<float>::max();
+  if(myclusters.empty()) return std::make_pair(output, nearest);
+  for(const auto& cluster: myclusters){
+    auto _center = cluster.first;
+    // std::cout << cluster.first.y() << std::endl;
+    if(_center.y() > 0.0){
+      output |= 1;
+      nearest = std::min(nearest, sqrtf(pow(_center.x(),2)+pow(_center.y(),2)));
+      x_min = std::min(x_min,_center.x());
+    }
+    else if(_center.y() < 0.0){
+      output |= 2;
+      nearest = std::min(nearest, sqrtf(_center.x()*_center.x()+_center.y()*_center.y()));
+      x_min = std::min(x_min,_center.x());
+    }
+  }
+  // std::cout << x_min << std::endl;
+  return std::make_pair(output,nearest);
+}
+
+void Visualizer::DrawCloudColored(const Cloud& cloud, float r, float g, float b) {
+  glPushMatrix();
+  glBegin(GL_POINTS);
+  glColor3f(r, g, b);
   for (const auto& point : cloud.points()) {
     glVertex3f(point.x(), point.y(), point.z());
   }

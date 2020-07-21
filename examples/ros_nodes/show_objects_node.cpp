@@ -105,6 +105,7 @@ int main(int argc, char* argv[]) {
   depth_ground_remover.AddClient(&clusterer);
   clusterer.AddClient(visualizer.object_clouds_client());
   subscriber.AddClient(&visualizer);
+  visualizer.AddClient(&subscriber);
 
   fprintf(stderr, "INFO: Running with angle tollerance: %f degrees\n",
           angle_tollerance.ToDegrees());

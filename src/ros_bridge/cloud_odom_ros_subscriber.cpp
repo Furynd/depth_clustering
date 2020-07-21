@@ -82,7 +82,7 @@ CloudOdomRosSubscriber::CloudOdomRosSubscriber(NodeHandle* node_handle,
                                                const ProjectionParams& params,
                                                const string& topic_clouds,
                                                const string& topic_odom)
-    : AbstractSender{SenderType::STREAMER}, _params{params} {
+    : AbstractSender{SenderType::STREAMER}, ClientT{}, _params{params} {
   _node_handle = node_handle;
   _topic_clouds = topic_clouds;
   _topic_odom = topic_odom;
@@ -90,6 +90,7 @@ CloudOdomRosSubscriber::CloudOdomRosSubscriber(NodeHandle* node_handle,
 
   _subscriber_clouds = nullptr;
   _subscriber_odom = nullptr;
+
   _sync = nullptr;
 }
 
@@ -109,6 +110,12 @@ void CloudOdomRosSubscriber::StartListeningToRos() {
     _subscriber_clouds->registerCallback(
         &CloudOdomRosSubscriber::CallbackVelodyne, this);
   }
+  stat_publisher = _node_handle->advertise<std_msgs::UInt8> ("/lidar_front", 100);
+  dist_publisher = _node_handle->advertise<std_msgs::Float32> ("/lidar_front_dist", 100);
+}
+
+void CloudOdomRosSubscriber::OnNewObjectReceived(const std::pair<char,float>& inp, const int sender_id){
+  CloudOdomRosSubscriber::publishStat(inp.first, inp.second);
 }
 
 void CloudOdomRosSubscriber::Callback(const PointCloud2::ConstPtr& msg_cloud,

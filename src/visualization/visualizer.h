@@ -13,8 +13,10 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 #include "communication/abstract_client.h"
+#include "communication/abstract_sender.h"
 #include "utils/cloud.h"
 #include "utils/useful_typedefs.h"
 
@@ -52,7 +54,11 @@ class ObjectPtrStorer
  */
 class Visualizer : public QGLViewer,
                    public AbstractClient<Cloud>,
+                   public AbstractSender<std::pair<char,float> >,
                    public IUpdateListener {
+
+  using SenderT = AbstractSender<std::pair<char,float> >;
+
  public:
   explicit Visualizer(QWidget* parent = 0);
   virtual ~Visualizer();
@@ -60,6 +66,8 @@ class Visualizer : public QGLViewer,
   void OnNewObjectReceived(const Cloud& cloud, const int id) override;
 
   void onUpdate() override;
+
+  std::pair<char,float> getClusters();
 
   ObjectPtrStorer* object_clouds_client() { return &_cloud_obj_storer; }
 
@@ -69,11 +77,13 @@ class Visualizer : public QGLViewer,
 
  private:
   void DrawCloud(const Cloud& cloud);
+  void DrawCloudColored(const Cloud& cloud, float r, float g, float b);
   void DrawCube(const Eigen::Vector3f& center, const Eigen::Vector3f& scale);
 
   bool _updated;
   ObjectPtrStorer _cloud_obj_storer;
   Cloud _cloud;
+  std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f> > myclusters;
   mutable std::mutex _cloud_mutex;
 };
 

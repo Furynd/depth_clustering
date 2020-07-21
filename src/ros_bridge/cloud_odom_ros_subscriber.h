@@ -22,6 +22,8 @@
 #define SRC_ROS_BRIDGE_CLOUD_ODOM_ROS_SUBSCRIBER_H_
 
 #include <ros/ros.h>
+#include <std_msgs/UInt8.h>
+#include <std_msgs/Float32.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/Odometry.h>
 #include <message_filters/subscriber.h>
@@ -32,6 +34,7 @@
 #include <map>
 
 #include "communication/abstract_sender.h"
+#include "communication/abstract_client.h"
 #include "utils/pose.h"
 #include "utils/cloud.h"
 #include "utils/useful_typedefs.h"
@@ -41,11 +44,12 @@ namespace depth_clustering {
 /**
  * @brief      Class for cloud odom ros subscriber.
  */
-class CloudOdomRosSubscriber : public AbstractSender<Cloud> {
+class CloudOdomRosSubscriber : public AbstractSender<Cloud>, public AbstractClient<std::pair<char,float> > {
   using PointCloudT = sensor_msgs::PointCloud2;
   using OdometryT = nav_msgs::Odometry;
   using ApproximateTimePolicy =
       message_filters::sync_policies::ApproximateTime<PointCloudT, OdometryT>;
+  using ClientT = AbstractClient<std::pair<char,float> >;
 
  public:
   CloudOdomRosSubscriber(ros::NodeHandle* node_handle,
@@ -57,6 +61,8 @@ class CloudOdomRosSubscriber : public AbstractSender<Cloud> {
     delete _subscriber_clouds;
     delete _sync;
   }
+
+  void OnNewObjectReceived(const std::pair<char,float>& inp, const int sender_id) override;
 
   /**
    * @brief      Get synchronized odometry and cloud
@@ -79,6 +85,15 @@ class CloudOdomRosSubscriber : public AbstractSender<Cloud> {
    */
   void StartListeningToRos();
 
+  void publishStat(char out, float dist){
+    std_msgs::UInt8 msg;
+    std_msgs::Float32 msg2;
+    msg.data = out;
+    msg2.data = dist;
+    stat_publisher.publish(msg);
+    dist_publisher.publish(msg2);
+  }
+
  protected:
   Pose RosOdomToPose(const OdometryT::ConstPtr& msg);
   Cloud::Ptr RosCloudToCloud(const PointCloudT::ConstPtr& msg);
@@ -91,11 +106,18 @@ class CloudOdomRosSubscriber : public AbstractSender<Cloud> {
   std::string _topic_clouds;
   std::string _topic_odom;
 
+  ros::Publisher stat_publisher;
+  ros::Publisher dist_publisher;
+
   ProjectionParams _params;
 
   int _msg_queue_size;
 };
 
+// class StopPublisher{
+
+
+// };
 }  // namespace depth_clustering
 
 #endif  // SRC_ROS_BRIDGE_CLOUD_ODOM_ROS_SUBSCRIBER_H_
